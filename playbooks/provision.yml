@@ -1,0 +1,139 @@
+---
+- hosts: pinode
+  remote_user: "{{ admin_user }}"
+  tasks:
+
+  - name: ensure static IP is assigned
+    become: yes
+    blockinfile:
+      path: /etc/dhcpcd.conf
+      block: |
+        interface eth0
+        static ip_address={{ lan_prefix }}.{{ node_number }}
+        static routers={{ gateway }}
+        static domain_name_servers={{ dns_server }}
+
+  - name: ensure {{ admin_user }} user is created
+    remote_user: pi
+    become: yes
+    user:
+      name: "{{ admin_user }}"
+      password_lock: yes
+
+  - name: ensure {{ admin_user }} user can do passwordless sudo
+    remote_user: pi
+    become: yes
+    lineinfile:
+      path: /etc/sudoers.d/010_{{ admin_user }}-nopasswd
+      line: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL"
+      validate: visudo -cf "%s"
+      create: yes
+
+  - name: ensure SSH key is copied to remote
+    become: yes
+    authorized_key:
+      user: "{{ admin_user }}"
+      state: present
+      key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
+
+  - name: ensure pi user cannot sudo
+    become: yes
+    file:
+      path: /etc/sudoers.d/ 010_pi-nopasswd
+      state: absent
+
+  - name: ensure pi user is locked
+    become: yes
+    user:
+      name: pi
+      password_lock: yes
+
+  - name: ensure SSH password auth is disabled
+    become: yes
+    become_method: sudo
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: "^PasswordAuthentication"
+      line: "PasswordAuthentication no"
+  
+  - name: ensure SSH challenge response auth is disabled
+    become: yes
+    become_method: sudo
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: "^ChallengeResponseAuthentication"
+      line: "ChallengeResponseAuthentication no"
+  
+  - name: ensure kernel flags are set for k3s
+    become: yes
+    become_method: sudo
+    lineinfile:
+      path: /boot/cmdline.txt
+      backrefs: true
+      regexp: "(.*rootwait)$"
+      line: "\\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory"
+  
+  - name: ensure hostname is assigned
+    become: yes
+    become_method: sudo
+    hostname:
+      name: "{{ inventory_hostname }}"
+  
+  - name: ensure gpu is assigned 16mb memory
+    become: yes
+    become_method: sudo
+    ini_file:
+      path: /boot/config.txt
+      section: all
+      option: gpu_mem
+      value: "16"
+      no_extra_spaces: yes
+
+  - name: update everything
+    become: yes
+    apt:
+      update_cache: yes
+      upgrade: safe
+
+  - name: ensure packages are installed
+    become: yes
+    apt:
+      pkg:
+        - vim
+        - python-setuptools
+        - python3-pip
+
+  - name: ensure glances is installed
+    become: yes
+    pip:
+      name: glances
+      executable: pip3
+
+  - name: ensure k3s binary is copied
+    become: yes
+    copy:
+      src: k3s-armhf
+      dest: /usr/local/bin/k3s
+      mode: "0755"
+
+  - name: ensure yq binary is copied
+    become: yes
+    copy:
+      src: yq_linux_arm
+      dest: /usr/local/bin/yq
+      mode: "0755"
+
+  - name: reboot to apply changes
+    become: yes
+    become_method: sudo
+    reboot: 
+
+  - name: ensure k3s service is installed
+    environment:
+      K3S_TOKEN: "{{ k3s_secret }}"
+      INSTALL_K3S_EXEC: "server"
+      K3S_NODE_NAME: "{{ inventory_hostname }}"
+      K3S_URL: '{{ "" if init is defined else "https://{{ hostvars[groups.pinode[0]].inventory_hostname }}:6443" }}'
+    script:
+      cmd: 'install.sh{{ " --cluster-init" if init is defined else "" }}'
+      creates: /etc/systemd/system/k3s.service.env

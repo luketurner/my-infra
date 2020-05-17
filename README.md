@@ -118,17 +118,15 @@ Finally, you may also need an SD card reader in order to flash the microSD cards
 
 Before the Pis can be turned on and connected to the network, their microSD cards must be _flashed_ so the Pis can boot and connect to the network.
 
-"Flashing" in this case means the card is partitioned, has filesystems written, and OS files downloaded. 
-
-The simplest way to achieve this is by connecting the microSD card to your dev box and writing a prebaked disk image to the device. 
+"Flashing" in this case means the card is partitioned, has filesystems written, and OS files downloaded. The simplest way to achieve this is by connecting the microSD card to your dev box and writing a prebaked disk image to the device. 
 
 There's a variety of tools to flash SD cards with disk images. I used an open-source GUI tool called [balenaEtcher](https://www.balena.io/etcher/), which works cross platform. Eventually I would like to automate this step, though.
 
-Flash the Pis with the [Ubuntu 20.02 Server arm64+raspi image](http://cdimage.ubuntu.com/releases/20.04/release/ubuntu-20.04-preinstalled-server-arm64+raspi.img.xz). Using a different OS or version may cause the playbooks to fail.
+Using balenaEtcher, flash the microSD cards with the [Ubuntu 20.02 Server arm64+raspi image](http://cdimage.ubuntu.com/releases/20.04/release/ubuntu-20.04-preinstalled-server-arm64+raspi.img.xz). Flashing a different OS or version may cause the playbooks to fail.
 
 > **Note:** Ubuntu Server was chosen over Raspbian because some Docker images work better in an `arm64` architecture, which Raspbian does not support.
 
-Once you've flashed the image, we need to make one tweak to a file in the boot partition. 
+Once you've written the disk image to the microSD card, we need to make one tweak to a file in the boot partition to simplify the next step of provisioning. 
 
 Re-mount the partition (in Windows, I unplug and replug the card reader to do this), then find the `user-data` file and change the `expire: true` line to `expire: false`.
 
@@ -136,11 +134,13 @@ This enables our provisioning script to immediately connect with the default use
 
 ## Home Network Setup
 
-Home networks vary, but this is what mine looks like:
+Home networks can vary widely, especially among homelab types. This section assumes you have a typical home network, with a single router, a few connected devices, and a fairly standard configuration.
+
+If you're following this README exactly, you should have a separate switch for your Pis, which you can connect to your router according to the following diagram. The Pis are connected to the `Homelab Switch`, which connects to port 4 on the `Router`.
 
 ```
                ┌────────────┐                                 
-            ┌──│ISP Modem   │                                 
+            ┌──│ISP/Modem   │                                 
 ┌────────┐  │  └────────────┘   ┌────────┐                    
 │Router  │  │                   │Homelab │                    
 │        │  │                   │Switch  │      ┌────────────┐
@@ -158,7 +158,6 @@ Home networks vary, but this is what mine looks like:
                      └──────────────────────┘                 
 ```
 
-The Pis are connected to the `Homelab Switch`, which connects to port 4 on the `Router`.
 
 Ideally, the Pis are provisioned with a correspondence between their physical position in the switch, and the address they're allocated on the network, i.e.:
 
@@ -168,13 +167,19 @@ switch port 2: ip=x.x.x.2
 switch port 3: ip=x.x.x.3
 ```
 
-To achieve this with minimal impact on the rest of the home network, you can configure your router to put the switch into its own LAN subnet in the `192.168.123.0/24` address space. This is indicated by a `*` next to port 4 on the router in the above diagram.
+To achieve this with minimal impact on the rest of the home network, you can configure your router to put port 4 (the port you've connected the switch to) into its own LAN subnet in the `192.168.123.0/24` address space. This is indicated by a `*` next to port 4 in the above diagram.
 
-Configure the subnet to use DHCP addressing starting at `192.168.123.1`, then you can simply connect the devices to the switch one at a time, giving each enough time to connect to the network and reserve an IP address before connecting the next one.
+Also in the router settings, configure the `192.168.123.0/24` subnet to use DHCP addressing starting at `192.168.123.1`, then you can simply connect the devices to the switch one at a time, giving each enough time to connect to the network and reserve an IP address before connecting the next one. For my network, I used the following settings:
+
+|||
+|---|---|
+|Subnet IP|`192.168.123.0`|
+|Subnet mask|`255.255.255.0`|
+|DHCP allocation block|`192.168.123.1` -> `192.168.123.253`|
+|DHCP gateway|`192.168.123.254`|
+|DNS nameserver|`192.168.123.254`|
 
 Later provisioning steps will configure the Pis with static IPs to ensure they are not reassigned.
-
-> **Note:** My home router does not provide a UI to configure DHCP reservations for LAN subnets, so static IP assignments must be configured in the Pis themselves. If your router software allows it, these could be configured in the router instead.
 
 To summarize, for a three-node cluster, the IP addressing should look like this:
 
@@ -206,6 +211,7 @@ pi2 -> 192.168.123.2
 pi3 -> 192.168.123.3
 ```
 
+> **Note:** My home router does not provide a UI to configure DHCP reservations for LAN subnets, so static IP assignments must be configured in the Pis themselves. If your router software allows it, these could be configured in the router as well.
 
 
 ## Running the Playbooks
@@ -279,13 +285,26 @@ These tips all assume you've already SSHed into a Pi and are diagnosing it from 
 
 # Deploying Services
 
-Once your Kubernetes cluster is up and running, the next step is to provision shared services -- CI/CD, VPN, monitoring, etc.
+Once your Kubernetes cluster is up and running, the next step is to provision shared services and application services -- basically everything in these two layers:
 
-## Note on State
+```
+┌──────────────────────────────────────────────────────────────┐
+│          Application Services and Personal Projects          │
+└──────────────────────────────────────────────────────────────┘
+┌──────────────┐┌──────────────┐┌──────────────┐┌──────────────┐
+│ Data Storage ││  Networking  ││    CI/CD     ││  Monitoring  │
+└──────────────┘└──────────────┘└──────────────┘└──────────────┘
+```
 
-Many provisioned services require state. They can "request" that state by creating a `PersistentVolumeClaim` resource with no `storageClass`. This will use the cluster's default dynamic provisioning.
+## Note on Storage
 
-`k3s` comes with a default dynamic provisioner backed by local disk, meaning by default services will automatically persist data to the nodes themselves.
+Many provisioned services require a persistent filesystem to write their non-ephemeral data. 
+
+Using the dynamic volume provisioning API, Kubernetes makes it possible for services to request storage volumes in a way that's totally independent of _where_ that storage is actually provisioned.
+
+To leverage that feature, services in this repository will always create `PersistentVolumeClaim` resources with no `storageClass`. Thus, you **must decide where data is persisted** by configuring a [default StorageClass](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/#defaulting-behavior).
+
+`k3s` comes with a default dynamic provisioner backed by local disk, meaning by default services will automatically persist data to the nodes themselves. This is convenient for getting started.
 
 If you have a NAS device, you can use that as the default provisioner. I haven't got a NAS yet, though.
 
@@ -293,11 +312,11 @@ In a cloud environment, the default provisioner should be swapped to some block 
 
 ## Note on Ingress
 
-Services that want to expose routes to the outside world do so with `Ingress` resources. These resources must be handled by your choice of ingress controller.
+Services that want to expose routes to the outside world do so with `Ingress` resources. These resources must be handled by your choice of ingress controller in order for services to be exposed to the Internet.
 
 Running in the cloud, you'd want to pick the ingress controller that corresponds to the cloud platform you're using (e.g. the AWS ALB controller.)
 
-Running in the homelab, I used the Traefik ingest controller that's bundled with k3s.
+Running in the homelab, I used the Traefik ingest controller that's bundled with k3s. 
 
 ## Deployable Services
 
@@ -339,9 +358,7 @@ My hope is to eventually deploy everything using a bootstrapped CI/CD pipeline t
 
 ### Application Services
 
-Application services are those things which actually provide value to me, personally, instead of just providing an internal function within the cluster.
-
-These services are truly the raison d'etre for this cluster/project.
+Application services are those things which actually provide benefit to the operator, outside of just making it easier to manage the cluster. They are the raison d'etre for this cluster/project.
 
 * Huginn (task running thingy)
 * Fathom Analytics (open-source, private analytics for my websites)

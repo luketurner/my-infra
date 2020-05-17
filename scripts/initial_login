@@ -1,0 +1,13 @@
+#!/usr/bin/expect -f
+# Usage: scripts/initial_login
+# Convenience script that handles setting up the admin SSH user during provisioning.
+
+# note - host key checkin is disabled because `sshpass` does not support it.
+# Since this script should only be run against newly provisioned hosts with no key to check against, I'm OK with it.
+spawn ansible-playbook -i inventory.ini playbooks/pinode/user.yml --ask-pass --ssh-common-args "-o StrictHostKeyChecking=no"
+
+expect "password"
+
+send "ubuntu\r"
+
+interact

@@ -128,7 +128,7 @@ Using balenaEtcher, flash the microSD cards with the [Ubuntu 20.02 Server arm64+
 
 Once you've written the disk image to the microSD card, we need to make one tweak to a file in the boot partition to simplify the next step of provisioning. 
 
-Re-mount the partition (in Windows, I unplug and replug the card reader to do this), then find the `user-data` file and change the `expire: true` line to `expire: false`.
+Re-mount the boot partition as a writeable filesystem (in Windows, I just unplug and replug the card reader to do this), then find the `user-data` file and change the `expire: true` line to `expire: false`.
 
 This enables our provisioning script to immediately connect with the default user/pass (`ubuntu`/`ubuntu`) without having to handle password expiry.
 

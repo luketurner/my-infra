@@ -1,4 +1,4 @@
-# Personal Infrastructure
+# my infra
 
 This repository has tools and docs for a container-based "personal infrastructure" stack. 
 

@@ -11,8 +11,8 @@ If you want a simple solution, steer clear! (Maybe try [Dokku](http://dokku.view
 ## Table of Contents
 
 1. [Overview](#Overview)
-2. [Raspberry Pi Homelab](#Raspberry\ Pi\ Homelab)
-3. [Deploying services](#Deploying\ Services)
+2. [Raspberry Pi Homelab](<#Raspberry Pi Homelab>)
+3. [Deploying services](<#Deploying\ Services>)
 
 ## Background
 

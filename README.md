@@ -1,8 +1,10 @@
 # Personal Infrastructure
 
-This repository has scripts, config, etc. for operating a self-managed _personal version_ of the container-based infrastructure often used in "cloud native" organizations 
+This repository has tools and docs for a container-based "personal infrastructure" stack. 
 
-The end goal is to have a personally owned infrastructure stack that allows me to deploy personal projects quickly and easily.
+The goal is to let you deploy open-source services on your own hardware just as easily as you can deploy them in the cloud.
+
+There is a deliberate focus on using so-called "cloud-native" tools, including Kubernetes. If you want a simple solution, steer clear! (Maybe try [Dokku](http://dokku.viewdocs.io/dokku/) instead.)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -12,7 +14,7 @@ The end goal is to have a personally owned infrastructure stack that allows me t
 │ Data Storage ││  Networking  ││    CI/CD     ││  Monitoring  │
 └──────────────┘└──────────────┘└──────────────┘└──────────────┘
 ┌──────────────────────────────────────────────────────────────┐
-│                   Container Orchestration                    │
+│                Container Orchestration (k8s)                 │
 └──────────────────────────────────────────────────────────────┘
 ┌──────────────────────────────┐┌──────────────────────────────┐
 │     Pi Homelab Cluster       ││       Cloud Resources        │

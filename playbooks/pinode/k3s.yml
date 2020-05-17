@@ -1,0 +1,50 @@
+---
+- hosts: pinode
+  remote_user: "{{ admin_user }}"
+  tasks:
+
+  - name: ensure k3s binary is copied
+    become: yes
+    copy:
+      src: k3s-arm64
+      dest: /usr/local/bin/k3s
+      mode: "0755"
+
+  - name: ensure k3s service is installed (master)
+    when: init is defined
+    environment:
+      K3S_NODE_NAME: "{{ inventory_hostname }}"
+    script:
+      cmd: 'install.sh --flannel-backend=wireguard'
+      creates: /etc/systemd/system/k3s.service.env
+
+  - name: copy k3s token from master
+    when: init is defined
+    become: yes
+    register: k3s_token
+    shell:
+      cmd: 'cat /var/lib/rancher/k3s/server/node-token'
+
+  - name: ensure k3s service is installed (agent)
+    when: init is not defined and not hostvars[groups.pinode[0]].k3s_token.failed
+    environment:
+      K3S_NODE_NAME: "{{ inventory_hostname }}"
+      K3S_TOKEN: "{{ hostvars[groups.pinode[0]].k3s_token.stdout }}"
+      K3S_URL: 'https://{{ hostvars[groups.pinode[0]].inventory_hostname }}:6443'
+    # debug:
+    #   var: hostvars[groups.pinode[0]].k3s_token.stdout
+    script:
+      cmd: 'install.sh'
+      creates: /etc/systemd/system/k3s-agent.service.env
+
+  # Note -- The below play is for installing k3s in multimaster mode with dsqlite
+  # currently this causes segv errors on startup, see https://github.com/rancher/k3s/issues/1215
+  # - name: ensure k3s service is installed
+  #   environment:
+  #     K3S_TOKEN: "{{ k3s_secret }}"
+  #     INSTALL_K3S_EXEC: "server"
+  #     K3S_NODE_NAME: "{{ inventory_hostname }}"
+  #     K3S_URL: '{{ "" if init is defined else "https://{{ hostvars[groups.pinode[0]].inventory_hostname }}:6443" }}'
+  #   script:
+  #     cmd: 'install.sh{{ " --cluster-init" if init is defined else "" }}'
+  #     creates: /etc/systemd/system/k3s.service.env

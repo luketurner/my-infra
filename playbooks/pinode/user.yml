@@ -1,0 +1,38 @@
+---
+- hosts: pinode
+  remote_user: "{{ default_user }}"
+  tasks:
+
+  - name: ensure {{ admin_user }} user is created
+    become: yes
+    user:
+      name: "{{ admin_user }}"
+      password_lock: yes
+      shell: /usr/bin/bash
+
+  - name: ensure {{ admin_user }} user can do passwordless sudo
+    become: yes
+    lineinfile:
+      path: /etc/sudoers.d/010_{{ admin_user }}-nopasswd
+      line: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL"
+      validate: visudo -cf "%s"
+      create: yes
+
+  - name: ensure SSH key is copied to remote
+    become: yes
+    authorized_key:
+      user: "{{ admin_user }}"
+      state: present
+      key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
+
+  - name: ensure root user is locked
+    become: yes
+    user:
+      name: "root"
+      password_lock: yes
+
+  - name: ensure {{ default_user }} user is locked
+    become: yes
+    user:
+      name: "{{ default_user }}"
+      password_lock: yes

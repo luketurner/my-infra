@@ -1,0 +1,154 @@
+---
+- hosts: pinode
+  remote_user: "{{ admin_user }}"
+  tasks:
+
+  - name: ensure static IP is assigned
+    become: yes
+    when: static_ip is defined
+    copy:
+      dest: /etc/netplan/10-pinode.yaml
+      content: |
+        network:
+          version: 2
+          ethernets:
+            eth0:
+              dhcp4: yes
+              addresses: ["{{ static_ip }}/32"]
+              # gateway4: "{{ gateway }}" TODO - doesn't work in my LAN?
+              nameservers:
+                addresses: ["{{ dns_server }}"]
+
+  - name: disable default network configuration
+    become: yes
+    file:
+      path: /etc/netplan/50-cloud-init.yaml
+      state: absent
+
+  - name: ensure hostname is assigned
+    become: yes
+    hostname:
+      name: "{{ inventory_hostname }}"
+
+  - name: ensure SSH password auth is disabled
+    become: yes
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: "^PasswordAuthentication"
+      line: "PasswordAuthentication no"
+  
+  - name: ensure SSH challenge response auth is disabled
+    become: yes
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: "^ChallengeResponseAuthentication"
+      line: "ChallengeResponseAuthentication no"
+
+  - name: ensure SSH root login is disabled
+    become: yes
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: "^PermitRootLogin"
+      line: "PermitRootLogin no"
+
+  - name: ensure SSH login is limited to home network
+    become: yes
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: "^AllowUsers"
+      line: "AllowUsers {{ admin_user }}@{{ devbox_ip }}.*"
+
+  - name: ensure ufw allows traffic on port 22 from home network
+    ufw:
+      comment: "ssh from home network"
+      rule: allow
+      from_ip: "{{ devbox_ip }}.0/24"
+      to_port: "22"
+
+  - name: ensure ufw allows traffic on port 80
+    ufw:
+      comment: "traefik http ingress"
+      rule: allow
+      to_port: "80"
+
+  - name: ensure ufw allows traffic on port 443
+    ufw:
+      comment: "traefik https ingress"
+      rule: allow
+      to_port: "443"
+
+  - name: ensure ufw allows traffic on port 6443
+    ufw:
+      comment: "kubernetes server nodes"
+      rule: allow
+      to_port: "6443"
+
+  - name: ensure ufw allows traffic on port 51820
+    ufw:
+      comment: "flannel network (wireguard)"
+      rule: allow
+      to_port: "51820"
+
+  # enable if metrics are needed 
+  # - name: ensure ufw allows traffic on port 10250
+  #   ufw:
+  #     comment: "kubelet / metrics"
+  #     rule: allow
+  #     to_port: "10250"
+  
+  - name: ensure ufw is enabled
+    ufw:
+      state: enabled
+
+  - name: ensure kernel flags are set for k3s
+    become: yes
+    lineinfile:
+      path: /boot/firmware/cmdline.txt
+      backrefs: true
+      regexp: "(.*fixrtc)$"
+      line: "\\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory"
+  
+  - name: ensure gpu is assigned 16mb memory
+    become: yes
+    ini_file:
+      path: /boot/firmware/usercfg.txt
+      section: all
+      option: gpu_mem
+      value: "16"
+      no_extra_spaces: yes
+
+  - name: update everything
+    become: yes
+    apt:
+      update_cache: yes
+      upgrade: safe
+
+  - name: ensure packages are installed
+    become: yes
+    apt:
+      pkg:
+        - vim
+        - python-setuptools
+        - python3-pip
+        - wireguard
+
+  - name: ensure glances is installed
+    become: yes
+    pip:
+      name: glances
+      executable: pip3
+
+  - name: ensure yq binary is copied
+    become: yes
+    copy:
+      src: yq_linux_arm64
+      dest: /usr/local/bin/yq
+      mode: "0755"
+
+# TODO:
+# - Add unattended upgrading of security issues
+# - update traefic.yaml to enable Traefic CRDs
+
+  - name: reboot to apply changes
+    become: yes
+    reboot: 

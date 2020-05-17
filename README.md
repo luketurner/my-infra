@@ -2,9 +2,31 @@
 
 This repository has tools and docs for a container-based "personal infrastructure" stack. 
 
-The goal is to let you deploy open-source services on your own hardware just as easily as you can deploy them in the cloud.
+The goal is to let you deploy open-source services & personal projects on your own hardware in the same way you would deploy them in the cloud. There is a deliberate focus on using so-called "cloud-native" tools, including Kubernetes.
 
-There is a deliberate focus on using so-called "cloud-native" tools, including Kubernetes. If you want a simple solution, steer clear! (Maybe try [Dokku](http://dokku.viewdocs.io/dokku/) instead.)
+If you want a simple solution, steer clear! (Maybe try [Dokku](http://dokku.viewdocs.io/dokku/) instead.)
+
+**Important:** Think of this like a `dotfiles` repository for my homelab, not a polished product offering. All the tooling, scripts, playbooks, etc. have been written for myself. I've published them purely in case someone else finds them interesting.
+
+## Table of Contents
+
+1. [Overview](#Overview)
+2. [Raspberry Pi Homelab](#Raspberry\ Pi\ Homelab)
+3. [Deploying services](#Deploying\ Services)
+
+## Background
+
+This README assumes the operator has preexisting experience with DevOps, CI/CD concepts, and container orchestration with Kubernetes.
+
+For additional background, check the following links:
+
+- [Ansible docs](https://docs.ansible.com/ansible/latest/user_guide/index.html)
+- [Kubernetes docs](https://kubernetes.io/docs/home/)
+- [k3s docs](https://rancher.com/docs/k3s/latest/en/)
+
+# Overview
+
+The following diagram roughly illustrates the different parts of this project and how they relate to each other:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -21,17 +43,13 @@ There is a deliberate focus on using so-called "cloud-native" tools, including K
 └──────────────────────────────┘└──────────────────────────────┘
 ```
 
-**Important:** Think of this like a `dotfiles` repository for my homelab, not a polished product offering. All the tooling, scripts, playbooks, etc. have been written for myself. I've published them purely in case someone else finds them interesting.
+The top box, `Application Services and Personal Projects`, represent the things you actually want to run and use (e.g. Huginn, Nextcloud, etc.) 
 
-## Background
+The tier below that represents shared services and utilities that provide locally-running versions of common cloud services like S3 or Github. 
 
-This README assumes the operator has preexisting experience with DevOps, CI/CD concepts, and container orchestration with Kubernetes.
+Below that is `Container Orchestration (k8s)`. This tier is important because it provides a layer of abstraction that allows applications to be managed and deployed in an automated, "node-agnostic" fashion. It also provides a consistent networking environment, rolling deployments, and other useful features.
 
-For additional background, check the following links:
-
-- [Ansible docs](https://docs.ansible.com/ansible/latest/user_guide/index.html)
-- [Kubernetes docs](https://kubernetes.io/docs/home/)
-- [k3s docs](https://rancher.com/docs/k3s/latest/en/)
+Finally, the bottom tier is the "compute." Most of the stuff in this README has been tested on my Raspberry Pi cluster, and I dedicate a section of this README to discussing how to provision a Pi cluster of your own. But I've also used a Digital Ocean managed Kubernetes cluster with good success. In theory, any Kubernetes environment with the appropriate controllers would work.
 
 # Raspberry Pi Homelab
 

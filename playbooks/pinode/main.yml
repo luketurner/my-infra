@@ -57,52 +57,65 @@
     lineinfile:
       path: /etc/ssh/sshd_config
       regexp: "^AllowUsers"
-      line: "AllowUsers {{ admin_user }}@{{ devbox_subnet }}.*"
+      line: "AllowUsers {{ admin_user }}@{{ devbox_subnet_ssh }}"
 
   - name: ensure ufw allows traffic on port 22 from home network
+    become: yes
     ufw:
       comment: "ssh from home network"
       rule: allow
-      from_ip: "{{ devbox_subnet }}.0/24"
+      from_ip: "{{ devbox_subnet }}"
       to_port: "22"
 
   - name: ensure ufw allows traffic on port 80 from home network
+    become: yes
     ufw:
       comment: "traefik http ingress"
       rule: allow
-      from_ip: "{{ lan_subnet }}.0/24"
+      from_ip: "{{ lan_subnet }}"
       to_port: "80"
 
   - name: ensure ufw allows traffic on port 443 from home network
+    become: yes
     ufw:
       comment: "traefik https ingress"
       rule: allow
-      from_ip: "{{ lan_subnet }}.0/24"
+      from_ip: "{{ lan_subnet }}"
       to_port: "443"
 
   - name: ensure ufw allows traffic on port 6443 from home network
+    become: yes
     ufw:
       comment: "kubernetes server nodes"
       rule: allow
-      from_ip: "{{ lan_subnet }}.0/24"
+      from_ip: "{{ lan_subnet }}"
       to_port: "6443"
 
   - name: ensure ufw allows traffic on port 51820 from homelab subnet
+    become: yes
     ufw:
       comment: "flannel network (wireguard)"
       rule: allow
-      from_ip: "{{ homelab_subnet }}.0/24"
+      from_ip: "{{ homelab_subnet }}"
       to_port: "51820"
 
   # enable if metrics are needed 
   # - name: ensure ufw allows traffic on port 10250
+  #   become: yes
   #   ufw:
   #     comment: "kubelet / metrics"
   #     rule: allow
   #     from_ip: "{{ lan_subnet }}.0/24"
   #     to_port: "10250"
+
+  - name: ensure ufw blocks all other incoming connections by default
+    become: yes
+    ufw:
+      default: deny
+      direction: incoming
   
   - name: ensure ufw is enabled
+    become: yes
     ufw:
       state: enabled
 

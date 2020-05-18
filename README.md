@@ -247,7 +247,8 @@ The first host (`pi1`) is the master -- but the playbook will be updated to use 
 
 Notable configuration differences:
 
-* `--flannel-backend` set to `wireguard` (default was `vxlan`)
+- `--flannel-backend` set to `wireguard` (default was `vxlan`)
+- These components are disabled: `traefik`, `servicelb`, `metrics-server`, `local-storage`
 
 ## Configuring kubectl
 

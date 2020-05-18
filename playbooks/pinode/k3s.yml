@@ -15,7 +15,7 @@
     environment:
       K3S_NODE_NAME: "{{ inventory_hostname }}"
     script:
-      cmd: 'install.sh --flannel-backend=wireguard'
+      cmd: 'install.sh --flannel-backend=wireguard --disable traefik --disable servicelb --disable metrics-server --disable local-storage'
       creates: /etc/systemd/system/k3s.service.env
 
   - name: copy k3s token from master

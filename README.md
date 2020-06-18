@@ -1,4 +1,6 @@
-# my infra
+> **DEPRECATION NOTICE:** I'm no longer doing work in this repository; see https://github.com/luketurner/laboratory for the successor project.
+
+# About
 
 This repository has tools and docs for a container-based "personal infrastructure" stack. 
 
